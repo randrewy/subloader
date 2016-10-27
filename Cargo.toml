@@ -1,0 +1,11 @@
+[package]
+name = "sub_searcher"
+version = "0.1.0"
+authors = ["Andrew Rakhubov <rakhubov@yandex.ru>"]
+
+[dependencies]
+xmlrpc = {path = "D:/STD/Projects/_Library/_3rdParty/xml-rpc-rs-master"}
+hyper  = "0.9.10"
+select = "0.3.0"
+zip = "0.1.19"
+regex = "0.1"
