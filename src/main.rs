@@ -172,9 +172,30 @@ fn print_files(dir: &str) {
     }
 }
 
-//fn get_search_query(file: &str) -> String {
-//    let re = Regex::new(r"(\.*).[Ss](\d+)").unwrap();
-//}
+fn extract_name(file: &str) -> String {
+    {
+        let re = Regex::new(r"(.+?\.)([Ss]\d+\.?[Ee]\d+)").unwrap();
+        for caps in re.captures_iter(file) {
+            return caps.at(1).unwrap().to_string() + caps.at(2).unwrap();
+        }
+    }
+    {
+        let re = Regex::new(r"(.+?\.)(\d+[Xx]\d+)").unwrap();
+        for caps in re.captures_iter(file) {
+            return caps.at(1).unwrap().to_string() + caps.at(2).unwrap();
+        }
+    }
+    Path::new(file)
+        .file_stem()
+        .unwrap_or(&std::ffi::OsStr::new(""))
+        .to_str()
+        .unwrap_or("")
+        .to_string()
+}
+
+fn get_search_query(file: &str) -> String {
+    extract_name(file).replace(".", "+").replace(" ", "+")
+}
 
 #[derive(Debug)]
 pub struct Video {
@@ -184,7 +205,7 @@ pub struct Video {
 
 impl Video {
     pub fn name(&self) -> String {
-        self.path.to_str().unwrap_or("").to_string()
+        self.path.file_name().unwrap_or(&std::ffi::OsStr::new("")).to_str().unwrap_or("").to_string()
     }
 }
 
@@ -202,7 +223,7 @@ fn collect_videos(dir: &str) -> Vec<Video> {
                 } else if is_video(&p.path()) {
                     result.push(Video {
                         subs: have_downloded_subs(&p.path()),
-                        path: Box::from(p.path())
+                        path: Box::from(p.path()),
                     });
                 }
             } else {
@@ -219,5 +240,36 @@ fn collect_videos(dir: &str) -> Vec<Video> {
 
 
 fn main() {
+
+    let vids = collect_videos("D:/Downloads");
+    for (i, v) in vids.iter()
+        .enumerate()
+        .filter(|x| !x.1.subs) {
+        println!("{}: {}", i, v.name());
+    }
+
+    let mut input = String::new();
+    println!("Please input video index");
+    std::io::stdin().read_line(&mut input).expect("failed to read index");
+    let index: usize = input.trim().parse().expect("Please type a number!");
+
+    let video = &vids[index];
+    println!("selected {:?}", &video);
+    println!("query is {}", get_search_query(&video.name()));
+
+    println!("{:?}", &stub_subscene(&get_search_query(&video.name()), "English"));
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::get_search_query;
+
+    #[test]
+    fn test_get_search_query() {
+        assert_eq!("Fargo.S01E10", get_search_query("Fargo.S01E10.Morton's.Fork.720p.[rofl].mkv"));
+        assert_eq!("Fargo.1X09", get_search_query("Fargo.1X09.A.Fox.A.Ra..."));
+        assert_eq!("Fargo The Heap", get_search_query("Fargo The Heap.avi"));
+    }
 
 }
