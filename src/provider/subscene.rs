@@ -76,10 +76,8 @@ impl Provider for SubsceneProvider{
         let mut query = "https://subscene.com/subtitles/release?q=".to_owned();
         query += name;
         query += "&l=";
-        println!("searching ... '{}'", query);
 
         let document = ::utils::get_document(&query);
-        println!("Document ... '{:?}'", document);
         search_on_page(&document, lang)
     }
 }
