@@ -11,6 +11,14 @@ pub fn write_file(fname: &str, data: &Vec<u8>) -> Result<()> {
     Ok(())
 }
 
+pub fn open_file_to_str(fname: &str) -> Result<String> {
+    let mut string = String::new();
+    match File::open(fname).unwrap().read_to_string(&mut string) {
+        Ok(_) => Ok(string),
+        Err(e) => Err(e),
+    }
+}
+
 pub fn get_document(url: &str) -> Document {
     let client = Client::new();
     let mut response = client.get(url)

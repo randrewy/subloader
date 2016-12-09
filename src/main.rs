@@ -8,6 +8,16 @@ extern crate sub_searcher;
 use sub_searcher::utils;
 use sub_searcher::provider::*;
 
+extern crate toml;
+extern crate rustc_serialize;
+
+#[derive(RustcDecodable)]
+struct Config {
+    movie_folder: String,
+    movie_ext: Vec<String>,
+    max_results: usize,
+}
+
 #[derive(Debug)]
 pub struct Video {
     subs: bool,
@@ -24,9 +34,8 @@ impl Video {
     }
 }
 
-fn is_video(path: &Path) -> bool {
-    let extensions = vec!["avi",  "mkv"];
-    extensions.contains(&path.extension().unwrap_or(&OsStr::new("")).to_str().unwrap_or(""))
+fn is_video(path: &Path, extensions: &[String]) -> bool {
+    extensions.contains(&path.extension().unwrap_or(&OsStr::new("")).to_str().unwrap_or("").to_owned())
 }
 
 fn has_downloded_subs(path: &Path) -> bool {
@@ -68,18 +77,18 @@ fn get_search_query(name: &str) -> String {
     extract_name(name).replace(".", "+").replace(" ", "+")
 }
 
-fn collect_videos(dir: &str) -> Vec<Video> {
+fn collect_videos(dir: &str, video_extensions: &[String]) -> Vec<Video> {
     let mut result = Vec::new();
     if let Ok(paths) = std::path::Path::read_dir(std::path::Path::new(dir)) {
         for path in paths {
             if let Ok(p) = path {
                 if p.path().is_dir() {
                     if let Some(str_dir) = p.path().to_str() {
-                        result.append(&mut collect_videos(str_dir));
+                        result.append(&mut collect_videos(str_dir, video_extensions));
                     } else {
                         println!("Stringify failed on {:?}", p.path());
                     }
-                } else if is_video(&p.path()) {
+                } else if is_video(&p.path(), video_extensions) {
                     result.push(Video {
                         subs: has_downloded_subs(&p.path()),
                         path: Box::from(p.path()),
@@ -104,7 +113,7 @@ fn print_names(vids: &[Video]) {
 
 fn read_index(max_value: usize) -> usize {
     let mut input = String::new();
-    println!("Please input video index");
+    println!("Please input index");
     std::io::stdin().read_line(&mut input).expect("failed to read index");
     let idx = input.trim().parse().expect("Please type a number!");
     if idx >= max_value {
@@ -132,8 +141,24 @@ fn search(providers: &[Box<Provider>], name: &str, lang: &str) -> Vec<Box<Downlo
     result
 }
 
+
+/// example of config.toml:
+/// movie_folder = "~/Downloads"
+/// movie_ext = [ "avi", "mkv" ]
+/// max_results = 10
 fn main() {
-    let vids = collect_videos("D:/Downloads");
+    let mut config_path = std::env::current_exe().unwrap();
+    config_path.pop();
+    config_path.push(Path::new("config.toml"));
+
+    let config: Config;
+    if let Ok(toml_str) = utils::open_file_to_str(config_path.to_str().unwrap()) {
+        config = toml::decode_str(&toml_str).unwrap();
+    } else {
+        panic!("config file read failed");
+    }
+
+    let vids = collect_videos(&config.movie_folder, &config.movie_ext);
     print_names(&vids);
     let index = read_index(vids.len());
     let video = &vids[index];
@@ -143,12 +168,14 @@ fn main() {
     let search_result = search(&providers, &video.name(), "English");
     for (i, v) in search_result.iter()
         .enumerate()
-        .take(10) {
+        .take(config.max_results) {
         println!("{}: {}", i, v.name());
     }
     let index = read_index(search_result.len());
     let sub = search_result[index].download();
-    utils::write_file(make_sub_path(&video.path.as_path()).to_str().unwrap(), &sub);
+    if let Ok(_) = utils::write_file(make_sub_path(&video.path.as_path()).to_str().unwrap(), &sub) {
+        println!("downloaded successfully");
+    }
 }
 
 
